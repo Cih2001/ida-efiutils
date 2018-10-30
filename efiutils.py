@@ -28,7 +28,7 @@ import ida_ua
 import efiguids
 
 
-MAX_STACK_DEPTH = 1
+MAX_STACK_DEPTH = 5
 IMAGE_HANDLE_NAME = 'gImageHandle'
 SYSTEM_TABLE_NAME = 'gSystemTable'
 SYSTEM_TABLE_STRUCT = 'EFI_SYSTEM_TABLE'
@@ -371,7 +371,7 @@ def rename_guids():
     # Find all the data segments in this binary
     for seg_addr in idautils.Segments():
         seg = ida_segment.getseg(seg_addr)
-        if seg.type == ida_segment.SEG_DATA:
+        if seg.type == ida_segment.SEG_DATA or True:
             print "Processing data segment at 0x{:08x}".format(seg_addr)
 
             # Find any GUIDs we know about in the data segment
@@ -387,7 +387,7 @@ def rename_guids():
                     d[0] == 0xFFFFFFFF and d[1] == 0xFFFFFFFF and
                     d[2] == 0xFFFFFFFF and d[3] == 0xFFFFFFFF
                    ):
-                    pass
+                    cur_addr += 0x10
                 else:
                     guid = GUID(bytes=struct.pack(
                         "<LLLL", d[0], d[1], d[2], d[3]
@@ -402,7 +402,7 @@ def rename_guids():
                         )
                         ida_name.set_name(cur_addr, struct_label)
                         labels[struct_label] = (cur_addr, guids[gstr])
-                cur_addr += 0x08
+                    cur_addr += 0x01
         else:
             print "Skipping non-data segment at 0x{:08x}".format(seg_addr)
 
@@ -461,7 +461,8 @@ def is_locate_protocol_param(xref):
     );
     """
     inst = idautils.DecodeInstruction(xref)
-
+    if inst == None:
+        return False
     # Must be 'lea rcx, gSmtGuid'
     if inst.get_canon_mnem() != 'lea' or inst.Op1.type != ida_ua.o_reg or \
        inst.Op1.reg != ida_idp.str2reg('rcx'):
@@ -612,3 +613,39 @@ def get_func_items_from_xref(xref):
             cur = ida_bytes.next_head(cur, idaapi.cvar.inf.maxEA)
 
     return items
+
+def search_guid(guid):
+	if isinstance(guid, basestring):
+		target_guid = GUID(string = guid)
+	else:
+		print "UNSUPPORTED FORMAT"
+		return
+		
+	for seg_addr in idautils.Segments():
+		seg = ida_segment.getseg(seg_addr)
+		cur_addr = seg.start_ea
+		seg_end = seg.end_ea
+		while cur_addr < seg_end:
+			d = [ida_bytes.get_dword(cur_addr),
+				 ida_bytes.get_dword(cur_addr+0x4),
+				 ida_bytes.get_dword(cur_addr+0x8),
+				 ida_bytes.get_dword(cur_addr+0xC)]
+			if (d[0] == 0 and d[1] == 0 and d[2] == 0 and d[3] == 0) or \
+			   (
+				d[0] == 0xFFFFFFFF and d[1] == 0xFFFFFFFF and d[2] == 0xFFFFFFFF and d[3] == 0xFFFFFFFF
+			   ):
+				cur_addr += 0x10
+			else:
+				cur_guid = GUID(bytes=struct.pack(
+					"<LLLL", d[0], d[1], d[2], d[3]
+				))
+				if str(target_guid) == str(cur_guid):
+					print "  - Found GUID {}  at 0x{:08x}".format(
+						str(target_guid), cur_addr
+					)
+					return
+				cur_addr += 1
+	print ("  - GUID %s not found" % (str(target_guid)))
+	
+	
+	
