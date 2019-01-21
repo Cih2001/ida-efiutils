@@ -83,6 +83,10 @@ class GUID:
         d = self.Data4
         return [self.Data1, self.Data2, self.Data3, d[0], d[1], d[2],
                 d[3], d[4], d[5], d[6], d[7]]
+				
+    def source_mode(self):
+        (Data1, Data2, Data3, d40, d41, d42, d43, d44, d45, d46, d47) = struct.unpack("<IHH8B", self.bytes)
+        return ("0x%x, 0x%x, 0x%x, {0x%x, 0x%x, 0x%x, 0x%x, 0x%x, 0x%x, 0x%x, 0x%x }" % (Data1, Data2, Data3, d40, d41, d42, d43, d44, d45, d46, d47))
 
 
 def go():
@@ -402,6 +406,7 @@ def rename_guids():
                         )
                         ida_name.set_name(cur_addr, struct_label)
                         labels[struct_label] = (cur_addr, guids[gstr])
+                        cur_addr += 0xf
                     cur_addr += 0x01
         else:
             print "Skipping non-data segment at 0x{:08x}".format(seg_addr)
@@ -566,6 +571,11 @@ def guid_at_addr(guid_addr):
         ida_bytes.get_dword(guid_addr + 0xC)
     ))
 
+def print_guid_at_addr(guid_addr):
+	guid = guid_at_addr(guid_addr)
+	print guid
+	print guid.source_mode()
+	
 
 def underscore_to_global(name):
     return 'g'+''.join(list(s.capitalize() for s in name.lower().split('_')))
